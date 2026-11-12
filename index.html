@@ -639,6 +639,7 @@ function renderCal(origin,list){
   const wkLabel=t.getDay()===0?"Tonight":t.getDay()===6?"This weekend":"Tonight through Sunday";
   list.innerHTML=shared+
     (planRows.length?`<h3 class="sub">Your plans</h3>${dayRows(planRows)}`:"")+
+    (!m.length&&!state.q&&!state.styles.size&&!state.kinds.size&&!state.tags.size&&!state.openOnly?`<div class="notice">No dances are listed ${areaLabel(origin)} yet. Floorcraft's event listings cover Westchester, Rockland, Fairfield County and NYC. Tap <b>Studios &amp; venues</b> above to see dance studios here, or widen the distance.</div>`:"")+
     `<h3 class="sub">${wkLabel}</h3>`+(nowRows.length?dayRows(nowRows):`<p class="none">Nothing this week with these filters.</p>`)+
     `<h3 class="sub">${state.scene==="comp"?"Upcoming competitions":"Special dates"} <span class="subnote">${state.scene==="comp"?"next 12 months":"one-time events, competitions &amp; workshops · "+esc(rl)}</span></h3>`+(specialRows.length?dayRows(specialRows):`<p class="none">No one-time events after this weekend. Try a longer date range.</p>`)+
     (state.scene==="comp"?"":`<h3 class="sub">Weekly regulars <span class="subnote">recurring socials, classes &amp; club nights</span></h3>`+
@@ -823,8 +824,10 @@ function loadOSM(origin){const k=osmKey(origin);if(OSM.key===k)return;OSM.key=k;
   try{const c=JSON.parse(sessionStorage.getItem("osm:"+k)||"null");if(c){OSM.items=c;OSM.status="ready";return;}}catch(e){}
   const r=Math.round(osmRadius(origin)*1609),la=origin[0],lo=origin[1];
   const q=`[out:json][timeout:25];(nwr["leisure"="dance"](around:${r},${la},${lo});nwr["amenity"="dancing_school"](around:${r},${la},${lo});nwr["sport"="dance"](around:${r},${la},${lo}););out center tags 300;`;
-  fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}})
-    .then(r=>{if(!r.ok)throw 0;return r.json();}).then(j=>{if(OSM.key!==k)return;
+  const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
+  const tryEp=i=>fetch(EPS[i],{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}})
+    .then(r=>{if(!r.ok)throw 0;return r.json();}).catch(e=>{if(i+1<EPS.length)return tryEp(i+1);throw e;});
+  tryEp(0).then(j=>{if(OSM.key!==k)return;
       OSM.items=(j.elements||[]).filter(e=>e.tags&&e.tags.name).map(e=>{const t=e.tags,lat=e.lat??e.center?.lat,lng=e.lon??e.center?.lon;
         const addr=[[t["addr:housenumber"],t["addr:street"]].filter(Boolean).join(" "),t["addr:city"]].filter(Boolean).join(", ");
         return {id:"osm-"+e.type+e.id,osm:true,name:t.name,type:t.amenity==="dancing_school"?"school":"school",styles:[],address:addr,zip:t["addr:postcode"]||"",lat,lng,city:t["addr:city"]||"",state:t["addr:state"]||"",phone:t.phone||t["contact:phone"]||"",url:t.website||t["contact:website"]||"",hours:t.opening_hours||"",classes:"",notes:t["dance:style"]?"Styles: "+t["dance:style"].replace(/;/g,", "):""};}).filter(p=>typeof p.lat==="number");
