@@ -194,6 +194,10 @@ h3.sub:first-child{margin-top:6px}
 .linkbtn.quiet{color:var(--muted);font-size:12.5px;text-decoration:underline;text-underline-offset:2px}
 .feat{display:flex;flex-wrap:wrap;gap:5px}
 .feat span{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;color:var(--gold);box-shadow:inset 0 0 0 1.2px var(--gold)}
+.findmore{margin-top:14px;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.findmore .lbl{font-size:13px;font-weight:700;color:var(--ink);padding:0}
+.fm-links{display:flex;flex-wrap:wrap;gap:8px}
+.fm-links a{font-size:13.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:6px 12px;text-decoration:none}
 .venue-evs{display:flex;flex-direction:column;gap:2px;font-size:13.5px;background:var(--surface2);border-radius:10px;padding:8px 10px}
 .venue-evs .lbl{font-size:12px;color:var(--muted);font-weight:600;padding:0}
 .venue-evs em{font-style:normal;color:var(--muted)}
@@ -866,6 +870,14 @@ function loadOSM(origin){const k=osmKey(origin);if(OSM.key===k)return;OSM.key=k;
   Promise.all(["dance studio","ballroom","dance school"].map(t=>withTimeout(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&extratags=1&limit=40&bounded=1&viewbox=${vb}&q=${encodeURIComponent(t)}`).then(r=>r.ok?r.json():[]).catch(()=>[])))
     .then(arrs=>add([].concat(...arrs).filter(x=>x.name&&isDance(x.name)).map(x=>{const a=x.address||{},e=x.extratags||{};return mk("nm-"+x.osm_type+x.osm_id,x.name,+x.lat,+x.lon,{hn:a.house_number,street:a.road,city:a.city||a.town||a.village,zip:a.postcode,state:a.state,phone:e.phone,website:e.website,hours:e.opening_hours});}))).finally(done);
 }
+function findMore(origin){const where=origin.county?origin[2]+", "+origin[3]:origin[2]+", "+origin[3];
+  const g=q=>"https://www.google.com/maps/search/"+encodeURIComponent(q+" near "+where);
+  const y=q=>"https://www.yelp.com/search?find_desc="+encodeURIComponent(q)+"&find_loc="+encodeURIComponent(where);
+  return `<div class="findmore"><span class="lbl">Find more studios near ${esc(where)}</span><div class="fm-links">
+    <a href="${g("dance studios")}" target="_blank" rel="noopener">Dance studios · Google Maps</a>
+    <a href="${g("ballroom dance studio")}" target="_blank" rel="noopener">Ballroom · Google Maps</a>
+    <a href="${g("salsa latin dance classes")}" target="_blank" rel="noopener">Salsa &amp; Latin · Google Maps</a>
+    <a href="${y("dance studios")}" target="_blank" rel="noopener">Dance studios · Yelp</a></div></div>`;}
 function renderPlaces(origin,list){
   placeCount=0;
   const evOnly=!!(state.tags.size||state.kinds.size||state.openOnly||state.days.size);
@@ -880,7 +892,7 @@ function renderPlaces(origin,list){
     if(state.q){const h=[p.name,p.address,p.city,p.classes,p.notes,p.hours,...(p.styles||[])].join(" ").toLowerCase();if(!h.includes(state.q))return false;}return true;})
     .sort((a,b)=>a._mi-b._mi);
   placeCount=m.length;
-  $("#summary").innerHTML=`<span><strong>${m.length}</strong> studio${m.length===1?"":"s"} &amp; venue${m.length===1?"":"s"} ${areaLabel(origin)}</span><span>${places.length} listed nationwide</span>`;
+  $("#summary").innerHTML=`<span><strong>${m.length}</strong> studio${m.length===1?"":"s"} &amp; venue${m.length===1?"":"s"} ${areaLabel(origin)}</span><span> · ${places.length} in Floorcraft's own list</span>`;
   // merge live OpenStreetMap studios (only with no event-only filters, in non-competition scenes)
   if(!evOnly&&state.scene!=="comp"&&state.scene!=="club"){loadOSM(origin);
     if(OSM.status==="ready"){const near=(a,b)=>miles([a.lat,a.lng],[b.lat,b.lng])<0.25;
@@ -888,9 +900,9 @@ function renderPlaces(origin,list){
         if(state.q&&![o.name,o.address,o.notes].join(" ").toLowerCase().includes(state.q))return;
         if(places.some(p=>near(p,o)&&(p.name.toLowerCase().slice(0,6)===o.name.toLowerCase().slice(0,6)||near(p,o)&&miles([p.lat,p.lng],[o.lat,o.lng])<0.05)))return;m.push(o);});
       m.sort((a,b)=>a._mi-b._mi);placeCount=m.length;
-      $("#summary").innerHTML=`<span><strong>${m.length}</strong> studio${m.length===1?"":"s"} &amp; venue${m.length===1?"":"s"} ${areaLabel(origin)}</span><span>includes OpenStreetMap listings</span>`;}}
+      $("#summary").innerHTML=`<span><strong>${m.length}</strong> studio${m.length===1?"":"s"} &amp; venue${m.length===1?"":"s"} ${areaLabel(origin)}</span><span> · includes public map listings</span>`;}}
   const osmNote=state.scene==="comp"||state.scene==="club"||evOnly?"":OSM.status==="loading"?'<p class="none">Looking up dance studios near here from public maps… (can take up to 10 seconds)</p>':OSM.status==="none"?'<p class="none">The public maps didn\'t return extra studios here. Try a larger distance or a nearby city name.</p>':"";
-  if(!m.length){list.innerHTML=osmNote+`<div class="empty"><h2>None in this radius</h2><p>Widen the radius or clear the style filters.</p></div>`;return;}
+  if(!m.length){list.innerHTML=osmNote+`<div class="empty"><h2>No studios listed here yet</h2><p>Floorcraft's own studio list covers Westchester, Rockland, Fairfield County and NYC. Use the links below to see studios here, or widen the distance or clear filters.</p></div>`+findMore(origin);return;}
   list.innerHTML=osmNote+`<div class="places">${m.map(p=>{
     const type=PLACE_TYPES.find(t=>t.id===p.type);
     const styles=(p.styles||[]).map(id=>{const s=STYLES.find(x=>x.id===id);return s?`<span class="pill" style="--c:var(${s.c})" title="${esc(s.t)}">${esc(s.label)}</span>`:"";}).join("");
@@ -904,7 +916,7 @@ function renderPlaces(origin,list){
       ${(p.offers||[]).length?`<div class="feat">${(p.offers||[]).map(id=>{const f=FEATURES.find(x=>x.id===id);return f?`<span>${esc(f.label)}</span>`:"";}).join("")}</div>`:""}
       <dl class="kv">${p.introOffer?`<dt>Intro offer</dt><dd>${esc(p.introOffer)}</dd>`:""}${p.floorRental?`<dt>Floor rental</dt><dd>${esc(p.floorRental)}</dd>`:""}${p.hours?`<dt>Hours</dt><dd>${esc(p.hours)}</dd>`:""}${p.classes?`<dt>Classes</dt><dd>${esc(p.classes)}</dd>`:""}${p.phone?`<dt>Phone</dt><dd class="sel">${esc(p.phone)}</dd>`:""}${p.notes?`<dt>Notes</dt><dd>${esc(p.notes)}</dd>`:""}</dl>
       <div class="ev-foot">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Website</a>`:""}<a href="https://www.google.com/maps/search/?api=1&query=${mapQ}" target="_blank" rel="noopener">Directions</a>
-      ${canWrite!==false?`<button class="linkbtn" type="button" onclick="openPlace('${esc(p.id)}')">Edit</button>`:""}</div></article>`;}).join("")}</div>`;
+      ${canWrite!==false?`<button class="linkbtn" type="button" onclick="openPlace('${esc(p.id)}')">Edit</button>`:""}</div></article>`;}).join("")}</div>`+findMore(origin);
 }
 const pType=$("#p-type");PLACE_TYPES.forEach(t=>pType.add(new Option(t.label,t.id)));
 let pStyles=new Set(),editingPlace=null;
