@@ -830,8 +830,8 @@ function showNotice(t){const n=$("#notice");n.textContent=t;n.hidden=false;}
 
 /* ---------- studios & venues ---------- */
 function setTab(t){tab=t;["all","cal","places"].forEach(x=>$("#tab-"+x).setAttribute("aria-selected",t===x));
-  $("#rangeField").hidden=t==="places";$("#kindRow").hidden=t==="places";
-  try{localStorage.setItem("floorcraft-tab",t)}catch(e){}render();}
+  $("#kindRow").hidden=t==="places";
+  render();}
 $("#tab-all").onclick=()=>setTab("all");$("#tab-cal").onclick=()=>setTab("cal");$("#tab-places").onclick=()=>setTab("places");
 /* nearby studios from OpenStreetMap (live, nationwide) */
 const OSM={key:"",status:"",items:[]};
@@ -840,7 +840,7 @@ function osmRadius(o){return Math.min(o.county?25:state.radius,25);}
 function loadOSM(origin){const k=osmKey(origin);if(OSM.key===k)return;OSM.key=k;OSM.status="loading";OSM.items=[];
   try{const c=JSON.parse(sessionStorage.getItem("osm:"+k)||"null");if(c&&c.length){OSM.items=c;OSM.status="ready";return;}}catch(e){}
   const rad=osmRadius(origin),r=Math.round(rad*1609),la=origin[0],lo=origin[1];
-  const withTimeout=(url,opts)=>{const ac=new AbortController();const t=setTimeout(()=>ac.abort(),12000);return fetch(url,{...(opts||{}),signal:ac.signal}).finally(()=>clearTimeout(t));};
+  const withTimeout=(url,opts)=>{const ac=new AbortController();const t=setTimeout(()=>ac.abort(),(opts&&opts.ms)||12000);return fetch(url,{...(opts||{}),signal:ac.signal}).finally(()=>clearTimeout(t));};
   const mk=(id,name,lat,lng,t)=>({id,osm:true,name,type:"school",styles:[],offers:[],address:[[t.hn,t.street].filter(Boolean).join(" "),t.city].filter(Boolean).join(", "),zip:t.zip||"",lat,lng,city:t.city||"",state:t.state||"",phone:t.phone||"",url:t.website||"",hours:t.hours||"",classes:"",notes:t.styles?"Styles: "+t.styles:""});
   const isDance=n=>/danc|ballroom|salsa|tango|bachata|ballet|5rhythms|zumba|swing|hustle/i.test(n||"");
   let pending=3,found=[];
@@ -852,12 +852,14 @@ function loadOSM(origin){const k=osmKey(origin);if(OSM.key===k)return;OSM.key=k;
     try{if(found.length)sessionStorage.setItem("osm:"+k,JSON.stringify(found))}catch(e){}render();};
   const done=()=>{if(OSM.key!==k)return;if(--pending===0&&!found.length){OSM.status="none";render();}};
   // 1) OpenStreetMap Overpass (tags + names)
-  const q=`[out:json][timeout:20];(nwr["leisure"="dance"](around:${r},${la},${lo});nwr["amenity"="dancing_school"](around:${r},${la},${lo});nwr["sport"="dance"](around:${r},${la},${lo});nwr["name"~"dance|ballroom|salsa|tango",i](around:${r},${la},${lo}););out center tags 300;`;
+  const dLat0=r/111000,dLng0=r/(111000*Math.cos(la*Math.PI/180));const bb=[la-dLat0,lo-dLng0,la+dLat0,lo+dLng0].map(x=>x.toFixed(4)).join(",");
+  const q=`[out:json][timeout:30][bbox:${bb}];(nwr["leisure"="dance"];nwr["amenity"="dancing_school"];nwr["sport"="dance"];node["name"~"danc|ballroom|salsa|tango|ballet",i];way["name"~"danc|ballroom|salsa|tango|ballet",i]["building"];way["name"~"danc|ballroom|salsa|tango|ballet",i]["shop"];way["name"~"danc|ballroom|salsa|tango|ballet",i]["leisure"];way["name"~"danc|ballroom|salsa|tango|ballet",i]["amenity"];);out center tags 400;`;
   const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
-  const over=i=>withTimeout(EPS[i]+"?data="+encodeURIComponent(q)).then(r=>{if(!r.ok)throw 0;return r.json();}).catch(e=>{if(i+1<EPS.length)return over(i+1);throw e;});
+  const over=i=>withTimeout(EPS[i]+"?data="+encodeURIComponent(q),{ms:30000}).then(r=>{if(!r.ok)throw 0;return r.json();}).catch(e=>{if(i+1<EPS.length)return over(i+1);throw e;});
   over(0).then(j=>add((j.elements||[]).filter(e=>e.tags&&e.tags.name).map(e=>{const t=e.tags;return mk("osm-"+e.type+e.id,t.name,e.lat??e.center?.lat,e.lon??e.center?.lon,{hn:t["addr:housenumber"],street:t["addr:street"],city:t["addr:city"],zip:t["addr:postcode"],state:t["addr:state"],phone:t.phone||t["contact:phone"],website:t.website||t["contact:website"],hours:t.opening_hours,styles:(t["dance:style"]||"").replace(/;/g,", ")});}))).catch(()=>{}).finally(done);
   // 2) Photon (komoot) name search, biased to the location
-  Promise.all(["dance studio","ballroom","dance"].map(term=>withTimeout(`https://photon.komoot.io/api/?q=${encodeURIComponent(term)}&lat=${la}&lon=${lo}&limit=50`).then(r=>r.ok?r.json():{features:[]}).catch(()=>({features:[]}))))
+  const pb=[lo-dLng0,la-dLat0,lo+dLng0,la+dLat0].map(x=>x.toFixed(4)).join(",");
+  Promise.all(["dance","dance studio","ballroom","ballet","salsa","dance academy","tango","dance school"].map(term=>withTimeout(`https://photon.komoot.io/api/?q=${encodeURIComponent(term)}&bbox=${pb}&limit=50`).then(r=>r.ok?r.json():{features:[]}).catch(()=>({features:[]}))))
     .then(arr=>add([].concat(...arr.map(x=>x.features||[])).filter(f=>f.properties&&isDance(f.properties.name)&&f.properties.osm_key!=="highway").map(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates;return mk("ph-"+p.osm_type+p.osm_id,p.name,lat,lng,{hn:p.housenumber,street:p.street,city:p.city||p.town||p.district,zip:p.postcode,state:p.state});}))).finally(done);
   // 3) Nominatim, bounded to the search area
   const dLat=r/111000,dLng=r/(111000*Math.cos(la*Math.PI/180));const vb=[lo-dLng,la+dLat,lo+dLng,la-dLat].map(x=>x.toFixed(4)).join(",");
@@ -935,7 +937,7 @@ $("#pform").addEventListener("submit",async e=>{e.preventDefault();const err=$("
   finally{$("#pSave").disabled=false;}});
 
 /* ---------- boot ---------- */
-try{const st=localStorage.getItem("floorcraft-tab");if(st==="places"||st==="cal")setTab(st);}catch(e){}
+try{localStorage.removeItem("floorcraft-tab")}catch(e){}
 fetch("zips.json").then(r=>r.json()).then(j=>{ZIPS=j;render();}).catch(()=>{$("#where").textContent="Zip lookup failed to load";});
 render();
 canWrite=false;$("#contrib").hidden=true;
