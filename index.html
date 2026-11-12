@@ -183,6 +183,7 @@ h3.sub:first-child{margin-top:6px}
 @media (max-width:600px){.nights{flex-wrap:nowrap;width:100%}.nights .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;mask-image:linear-gradient(90deg,#000 88%,transparent);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}.nights .chips::-webkit-scrollbar{display:none}.nights .chip{flex:0 0 auto}}
 .chip.preset[aria-pressed="true"]{background:var(--btn);color:#fff}
 .chip.daychip{min-width:44px;justify-content:center}
+.looking{font-style:normal;color:var(--gold)}
 .compmeta{display:flex;flex-wrap:wrap;gap:4px 8px}
 .compmeta span{font-size:12.5px;font-weight:700;color:var(--gold);letter-spacing:.02em}
 .compmeta span+span::before{content:"·";margin-right:8px;color:var(--muted)}
@@ -593,7 +594,7 @@ function render(){
     renderCal(origin,list);const calHtml=list.innerHTML;
     const rl=$("#range").selectedOptions[0].textContent.toLowerCase();
     const calSum=$("#summary").innerHTML;void rl;
-    $("#summary").innerHTML=calSum.replace("</span>",` · <strong>${placeCount}</strong> venue${placeCount===1?"":"s"}</span>`);
+    $("#summary").innerHTML=calSum.replace("</span>",` · <strong>${placeCount}</strong> venue${placeCount===1?"":"s"}${OSM.status==="loading"&&state.scene!=="comp"&&state.scene!=="club"?' <em class="looking">· looking up studios…</em>':""}</span>`);
     list.innerHTML=state.scene==="comp"?calHtml:`<h2 class="sec">Dances &amp; events</h2>${calHtml}<h2 class="sec">Studios, clubs &amp; venues nearby</h2>${tmp.innerHTML}`;
     return;}
   renderCal(origin,list);
@@ -837,22 +838,32 @@ const OSM={key:"",status:"",items:[]};
 function osmKey(o){return o[0].toFixed(2)+","+o[1].toFixed(2)+","+osmRadius(o);}
 function osmRadius(o){return Math.min(o.county?25:state.radius,25);}
 function loadOSM(origin){const k=osmKey(origin);if(OSM.key===k)return;OSM.key=k;OSM.status="loading";OSM.items=[];
-  try{const c=JSON.parse(sessionStorage.getItem("osm:"+k)||"null");if(c){OSM.items=c;OSM.status="ready";return;}}catch(e){}
-  const r=Math.round(osmRadius(origin)*1609),la=origin[0],lo=origin[1];
-  const q=`[out:json][timeout:25];(nwr["leisure"="dance"](around:${r},${la},${lo});nwr["amenity"="dancing_school"](around:${r},${la},${lo});nwr["sport"="dance"](around:${r},${la},${lo});nwr["name"~"dance|ballroom|salsa|tango|bachata|5rhythms",i](around:${r},${la},${lo}););out center tags 300;`;
-  const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
-  const tryEp=i=>fetch(EPS[i],{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}})
-    .then(r=>{if(!r.ok)throw 0;return r.json();}).catch(e=>{if(i+1<EPS.length)return tryEp(i+1);throw e;});
-  const nomi=()=>{const dLat=r/111000,dLng=r/(111000*Math.cos(la*Math.PI/180));
-    const vb=[lo-dLng,la+dLat,lo+dLng,la-dLat].map(x=>x.toFixed(4)).join(",");
-    return Promise.all(["dance studio","ballroom","dance school"].map(t=>fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&extratags=1&limit=40&bounded=1&viewbox=${vb}&q=${encodeURIComponent(t)}`,{headers:{"Accept":"application/json"}}).then(r=>r.ok?r.json():[]).catch(()=>[])))
-      .then(arrs=>({elements:[].concat(...arrs).filter(x=>x.name).map(x=>({type:"nom",id:x.osm_type+x.osm_id,lat:+x.lat,lon:+x.lon,tags:{name:x.name,"addr:housenumber":x.address?.house_number,"addr:street":x.address?.road,"addr:city":x.address?.city||x.address?.town||x.address?.village,"addr:postcode":x.address?.postcode,website:x.extratags?.website,phone:x.extratags?.phone,opening_hours:x.extratags?.opening_hours}}))}));};
-  tryEp(0).then(j=>(j.elements||[]).length?j:nomi()).catch(()=>nomi()).then(j=>{if(OSM.key!==k)return;
-      const seenIds=new Set();OSM.items=(j.elements||[]).filter(e=>e.tags&&e.tags.name&&!seenIds.has(e.type+e.id)&&seenIds.add(e.type+e.id)).map(e=>{const t=e.tags,lat=e.lat??e.center?.lat,lng=e.lon??e.center?.lon;
-        const addr=[[t["addr:housenumber"],t["addr:street"]].filter(Boolean).join(" "),t["addr:city"]].filter(Boolean).join(", ");
-        return {id:"osm-"+e.type+e.id,osm:true,name:t.name,type:t.amenity==="dancing_school"?"school":"school",styles:[],address:addr,zip:t["addr:postcode"]||"",lat,lng,city:t["addr:city"]||"",state:t["addr:state"]||"",phone:t.phone||t["contact:phone"]||"",url:t.website||t["contact:website"]||"",hours:t.opening_hours||"",classes:"",notes:t["dance:style"]?"Styles: "+t["dance:style"].replace(/;/g,", "):""};}).filter(p=>typeof p.lat==="number");
-      OSM.status="ready";try{sessionStorage.setItem("osm:"+k,JSON.stringify(OSM.items))}catch(e){}render();})
-    .catch(()=>{if(OSM.key!==k)return;OSM.status="error";render();});}
+  try{const c=JSON.parse(sessionStorage.getItem("osm:"+k)||"null");if(c&&c.length){OSM.items=c;OSM.status="ready";return;}}catch(e){}
+  const rad=osmRadius(origin),r=Math.round(rad*1609),la=origin[0],lo=origin[1];
+  const withTimeout=(url,opts)=>{const ac=new AbortController();const t=setTimeout(()=>ac.abort(),12000);return fetch(url,{...(opts||{}),signal:ac.signal}).finally(()=>clearTimeout(t));};
+  const mk=(id,name,lat,lng,t)=>({id,osm:true,name,type:"school",styles:[],offers:[],address:[[t.hn,t.street].filter(Boolean).join(" "),t.city].filter(Boolean).join(", "),zip:t.zip||"",lat,lng,city:t.city||"",state:t.state||"",phone:t.phone||"",url:t.website||"",hours:t.hours||"",classes:"",notes:t.styles?"Styles: "+t.styles:""});
+  const isDance=n=>/danc|ballroom|salsa|tango|bachata|ballet|5rhythms|zumba|swing|hustle/i.test(n||"");
+  let pending=3,found=[];
+  const add=list=>{if(OSM.key!==k)return;const near=(a,b)=>Math.abs(a.lat-b.lat)<0.002&&Math.abs(a.lng-b.lng)<0.003;
+    list.forEach(o=>{if(!o||typeof o.lat!=="number"||!o.name)return;if(miles([la,lo],[o.lat,o.lng])>rad+1)return;
+      const dup=found.find(x=>x.name.toLowerCase()===o.name.toLowerCase()||(near(x,o)&&x.name.slice(0,5).toLowerCase()===o.name.slice(0,5).toLowerCase()));
+      if(dup){for(const f of["address","phone","url","hours","zip"])if(!dup[f]&&o[f])dup[f]=o[f];}else found.push(o);});
+    OSM.items=found.slice();if(found.length)OSM.status="ready";
+    try{if(found.length)sessionStorage.setItem("osm:"+k,JSON.stringify(found))}catch(e){}render();};
+  const done=()=>{if(OSM.key!==k)return;if(--pending===0&&!found.length){OSM.status="none";render();}};
+  // 1) OpenStreetMap Overpass (tags + names)
+  const q=`[out:json][timeout:20];(nwr["leisure"="dance"](around:${r},${la},${lo});nwr["amenity"="dancing_school"](around:${r},${la},${lo});nwr["sport"="dance"](around:${r},${la},${lo});nwr["name"~"dance|ballroom|salsa|tango",i](around:${r},${la},${lo}););out center tags 300;`;
+  const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
+  const over=i=>withTimeout(EPS[i]+"?data="+encodeURIComponent(q)).then(r=>{if(!r.ok)throw 0;return r.json();}).catch(e=>{if(i+1<EPS.length)return over(i+1);throw e;});
+  over(0).then(j=>add((j.elements||[]).filter(e=>e.tags&&e.tags.name).map(e=>{const t=e.tags;return mk("osm-"+e.type+e.id,t.name,e.lat??e.center?.lat,e.lon??e.center?.lon,{hn:t["addr:housenumber"],street:t["addr:street"],city:t["addr:city"],zip:t["addr:postcode"],state:t["addr:state"],phone:t.phone||t["contact:phone"],website:t.website||t["contact:website"],hours:t.opening_hours,styles:(t["dance:style"]||"").replace(/;/g,", ")});}))).catch(()=>{}).finally(done);
+  // 2) Photon (komoot) name search, biased to the location
+  Promise.all(["dance studio","ballroom","dance"].map(term=>withTimeout(`https://photon.komoot.io/api/?q=${encodeURIComponent(term)}&lat=${la}&lon=${lo}&limit=50`).then(r=>r.ok?r.json():{features:[]}).catch(()=>({features:[]}))))
+    .then(arr=>add([].concat(...arr.map(x=>x.features||[])).filter(f=>f.properties&&isDance(f.properties.name)&&f.properties.osm_key!=="highway").map(f=>{const p=f.properties,[lng,lat]=f.geometry.coordinates;return mk("ph-"+p.osm_type+p.osm_id,p.name,lat,lng,{hn:p.housenumber,street:p.street,city:p.city||p.town||p.district,zip:p.postcode,state:p.state});}))).finally(done);
+  // 3) Nominatim, bounded to the search area
+  const dLat=r/111000,dLng=r/(111000*Math.cos(la*Math.PI/180));const vb=[lo-dLng,la+dLat,lo+dLng,la-dLat].map(x=>x.toFixed(4)).join(",");
+  Promise.all(["dance studio","ballroom","dance school"].map(t=>withTimeout(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&extratags=1&limit=40&bounded=1&viewbox=${vb}&q=${encodeURIComponent(t)}`).then(r=>r.ok?r.json():[]).catch(()=>[])))
+    .then(arrs=>add([].concat(...arrs).filter(x=>x.name&&isDance(x.name)).map(x=>{const a=x.address||{},e=x.extratags||{};return mk("nm-"+x.osm_type+x.osm_id,x.name,+x.lat,+x.lon,{hn:a.house_number,street:a.road,city:a.city||a.town||a.village,zip:a.postcode,state:a.state,phone:e.phone,website:e.website,hours:e.opening_hours});}))).finally(done);
+}
 function renderPlaces(origin,list){
   placeCount=0;
   const evOnly=!!(state.tags.size||state.kinds.size||state.openOnly||state.days.size);
@@ -876,7 +887,7 @@ function renderPlaces(origin,list){
         if(places.some(p=>near(p,o)&&(p.name.toLowerCase().slice(0,6)===o.name.toLowerCase().slice(0,6)||near(p,o)&&miles([p.lat,p.lng],[o.lat,o.lng])<0.05)))return;m.push(o);});
       m.sort((a,b)=>a._mi-b._mi);placeCount=m.length;
       $("#summary").innerHTML=`<span><strong>${m.length}</strong> studio${m.length===1?"":"s"} &amp; venue${m.length===1?"":"s"} ${areaLabel(origin)}</span><span>includes OpenStreetMap listings</span>`;}}
-  const osmNote=state.scene==="comp"||state.scene==="club"||evOnly?"":OSM.status==="loading"?'<p class="none">Looking up more studios nearby from OpenStreetMap…</p>':OSM.status==="error"?'<p class="none">Couldn\'t reach OpenStreetMap for extra studios right now.</p>':"";
+  const osmNote=state.scene==="comp"||state.scene==="club"||evOnly?"":OSM.status==="loading"?'<p class="none">Looking up dance studios near here from public maps… (can take up to 10 seconds)</p>':OSM.status==="none"?'<p class="none">The public maps didn\'t return extra studios here. Try a larger distance or a nearby city name.</p>':"";
   if(!m.length){list.innerHTML=osmNote+`<div class="empty"><h2>None in this radius</h2><p>Widen the radius or clear the style filters.</p></div>`;return;}
   list.innerHTML=osmNote+`<div class="places">${m.map(p=>{
     const type=PLACE_TYPES.find(t=>t.id===p.type);
