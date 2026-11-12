@@ -660,7 +660,7 @@ function renderCal(origin,list){
   const wkLabel=t.getDay()===0?"Tonight":t.getDay()===6?"This weekend":"Tonight through Sunday";
   list.innerHTML=shared+
     (planRows.length?`<h3 class="sub">Your plans</h3>${dayRows(planRows)}`:"")+
-    (!m.length&&!state.q&&!state.styles.size&&!state.kinds.size&&!state.tags.size&&!state.openOnly?`<div class="notice">No dances are listed ${areaLabel(origin)} yet. Floorcraft's event listings cover Westchester, Rockland, Fairfield County and NYC. Tap <b>Studios &amp; venues</b> above to see dance studios here, or widen the distance.</div>`:"")+
+    (!m.length&&!state.q&&!state.styles.size&&!state.kinds.size&&!state.tags.size&&!state.openOnly?`<div class="notice">No dances are listed ${areaLabel(origin)} yet. Floorcraft's event listings cover the NY area (Westchester, Rockland, Fairfield County, NYC), South Florida and the Clearwater–St. Pete area. Tap <b>Studios &amp; venues</b> above to see dance studios here, or widen the distance.</div>`:"")+
     `<h3 class="sub">${wkLabel}</h3>`+(nowRows.length?dayRows(nowRows):`<p class="none">Nothing this week with these filters.</p>`)+
     `<h3 class="sub">${state.scene==="comp"?"Upcoming competitions":"Special dates"} <span class="subnote">${state.scene==="comp"?"next 12 months":"one-time events, competitions &amp; workshops · "+esc(rl)}</span></h3>`+(specialRows.length?dayRows(specialRows):`<p class="none">No one-time events after this weekend. Try a longer date range.</p>`)+
     (state.scene==="comp"?"":`<h3 class="sub">Weekly regulars <span class="subnote">recurring socials, classes &amp; club nights</span></h3>`+
@@ -902,7 +902,7 @@ function renderPlaces(origin,list){
       m.sort((a,b)=>a._mi-b._mi);placeCount=m.length;
       $("#summary").innerHTML=`<span><strong>${m.length}</strong> studio${m.length===1?"":"s"} &amp; venue${m.length===1?"":"s"} ${areaLabel(origin)}</span><span> · includes public map listings</span>`;}}
   const osmNote=state.scene==="comp"||state.scene==="club"||evOnly?"":OSM.status==="loading"?'<p class="none">Looking up dance studios near here from public maps… (can take up to 10 seconds)</p>':OSM.status==="none"?'<p class="none">The public maps didn\'t return extra studios here. Try a larger distance or a nearby city name.</p>':"";
-  if(!m.length){list.innerHTML=osmNote+`<div class="empty"><h2>No studios listed here yet</h2><p>Floorcraft's own studio list covers Westchester, Rockland, Fairfield County and NYC. Use the links below to see studios here, or widen the distance or clear filters.</p></div>`+findMore(origin);return;}
+  if(!m.length){list.innerHTML=osmNote+`<div class="empty"><h2>No studios listed here yet</h2><p>Floorcraft's own studio list covers the NY area, South Florida and the Clearwater–St. Pete area. Use the links below to see studios here, or widen the distance or clear filters.</p></div>`+findMore(origin);return;}
   list.innerHTML=osmNote+`<div class="places">${m.map(p=>{
     const type=PLACE_TYPES.find(t=>t.id===p.type);
     const styles=(p.styles||[]).map(id=>{const s=STYLES.find(x=>x.id===id);return s?`<span class="pill" style="--c:var(${s.c})" title="${esc(s.t)}">${esc(s.label)}</span>`:"";}).join("");
