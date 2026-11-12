@@ -191,6 +191,8 @@ h3.sub:first-child{margin-top:6px}
 .ev.ended{opacity:.55}
 .ev-sub{display:flex;gap:4px 12px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);margin-top:-2px}
 .linkbtn.quiet{color:var(--muted);font-size:12.5px;text-decoration:underline;text-underline-offset:2px}
+.feat{display:flex;flex-wrap:wrap;gap:5px}
+.feat span{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;color:var(--gold);box-shadow:inset 0 0 0 1.2px var(--gold)}
 .venue-evs{display:flex;flex-direction:column;gap:2px;font-size:13.5px;background:var(--surface2);border-radius:10px;padding:8px 10px}
 .venue-evs .lbl{font-size:12px;color:var(--muted);font-weight:600;padding:0}
 .venue-evs em{font-style:normal;color:var(--muted)}
@@ -281,7 +283,11 @@ textarea{min-height:64px;resize:vertical}
     <div class="filters" id="filters" hidden>
       <span class="flabel">Styles</span>
       <div class="chips" id="styleChips" role="group" aria-label="Styles"></div>
-      <div class="filters" id="kindRow"><span class="flabel">Type</span>
+      <span class="flabel">Venue type</span>
+      <div class="chips" id="ptypeChips" role="group" aria-label="Venue type"></div>
+      <span class="flabel">Studio offers</span>
+      <div class="chips" id="featChips" role="group" aria-label="Studio offers"></div>
+      <div class="filters" id="kindRow"><span class="flabel">Event type</span>
       <div class="chips" id="kindChips" role="group" aria-label="Event type"></div>
       <span class="flabel">Who can attend</span>
       <div class="chips"><button type="button" class="chip" id="openOnly" aria-pressed="false">Open to everyone</button></div>
@@ -372,7 +378,12 @@ textarea{min-height:64px;resize:vertical}
     <div class="field"><label for="p-hours">Hours</label><textarea id="p-hours" placeholder="Mon–Thu 12–10pm&#10;Sat 10am–4pm"></textarea></div>
     <div class="field"><label for="p-classes">Classes (one per line)</label><textarea id="p-classes" placeholder="Mon 7pm Beginner Smooth group&#10;Wed 8pm Intermediate Rhythm&#10;Privates & comp coaching by appointment"></textarea>
       <span class="hint">Recurring parties and classes can also go on the Dance calendar so they show up by date.</span></div>
-    <div class="field"><label for="p-notes">Notes</label><textarea id="p-notes" placeholder="Pro-Am program, first group class free, parking behind building…"></textarea></div>
+    <div class="field"><span class="lbl">Offers</span><div class="chips" id="p-feats"></div></div>
+    <div class="grid2">
+      <div class="field"><label for="p-intro">Intro offer</label><input id="p-intro" type="text" placeholder="First private lesson $49"></div>
+      <div class="field"><label for="p-rental">Practice floor rental</label><input id="p-rental" type="text" placeholder="$15/hour, weekday afternoons"></div>
+    </div>
+    <div class="field"><label for="p-notes">Notes</label><textarea id="p-notes" placeholder="Parking behind building, first group class free…"></textarea></div>
     <p class="err" id="p-err"></p>
     <div class="actions">
       <button type="button" class="btn ghost" id="pDel" hidden>Delete</button>
@@ -412,6 +423,7 @@ const KINDS=[
   {id:"competition",label:"Competition"},
   {id:"showcase",label:"Showcase / performance"},
 ];
+const FEATURES=[{id:"group",label:"Group classes"},{id:"private",label:"Private lessons"},{id:"proam",label:"Pro-Am"},{id:"compteam",label:"Competition team"},{id:"parties",label:"Public parties"},{id:"rental",label:"Practice floor rental"},{id:"wedding",label:"Wedding dances"},{id:"kids",label:"Kids classes"}];
 const PLACE_TYPES=[
   {id:"ballroom",label:"Ballroom studio"},
   {id:"school",label:"Dance school"},
@@ -443,7 +455,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 
 let tab="all", places=[], ZIPS=null, events=[], dbRef=null, canWrite=null, myId=null, editingId=null, dbState="loading";
 const state={zip:"10601",radius:60,range:120,q:"",styles:new Set(),kinds:new Set(),tags:new Set(),openOnly:false};
-state.days=new Set();state.scene="all";
+state.days=new Set();state.scene="all";state.ptypes=new Set();state.feats=new Set();
 const SCENES=[{id:"all",label:"All"},{id:"partner",label:"Ballroom & partner",styles:["smooth","standard","rhythm","latin","hustle","swing","salsa","tango","country","folk"]},{id:"club",label:"Club nights",styles:["club"]},{id:"move",label:"Movement & dance classes",styles:["somatic","ballet","jazz","hiphop","fitness"]},{id:"comp",label:"Competitions",kinds:["competition"]}];
 function inScene(item){if(state.scene==="all")return true;const sc=SCENES.find(x=>x.id===state.scene);if(sc.kinds)return sc.kinds.includes(item.kind);return (item.styles||[]).some(x=>sc.styles.includes(x));}
 function buildScenes(){const c=$("#sceneChips");c.innerHTML="";SCENES.forEach(sc=>{const b=chip(sc.label,state.scene===sc.id);b.classList.add("preset");b.onclick=()=>{state.scene=sc.id;try{localStorage.setItem("floorcraft-scene",sc.id)}catch(e){}buildScenes();render();};c.appendChild(b);});}
@@ -467,6 +479,10 @@ function chip(label,pressed,color,title){const b=document.createElement("button"
 function buildChips(){
   const sc=$("#styleChips");sc.innerHTML="";
   STYLES.forEach(s=>{const b=chip(s.label,state.styles.has(s.id),s.c,s.t);b.onclick=()=>{state.styles.has(s.id)?state.styles.delete(s.id):state.styles.add(s.id);persist();buildChips();render();};sc.appendChild(b);});
+  const pc=$("#ptypeChips");pc.innerHTML="";
+  PLACE_TYPES.forEach(k=>{const b=chip(k.label,state.ptypes.has(k.id));b.onclick=()=>{state.ptypes.has(k.id)?state.ptypes.delete(k.id):state.ptypes.add(k.id);buildChips();render();};pc.appendChild(b);});
+  const fc=$("#featChips");fc.innerHTML="";
+  FEATURES.forEach(k=>{const b=chip(k.label,state.feats.has(k.id));b.onclick=()=>{state.feats.has(k.id)?state.feats.delete(k.id):state.feats.add(k.id);buildChips();render();};fc.appendChild(b);});
   const tc=$("#tagChips");tc.innerHTML="";
   TAGS.forEach(k=>{const b=chip(k.label,state.tags.has(k.id));b.onclick=()=>{state.tags.has(k.id)?state.tags.delete(k.id):state.tags.add(k.id);buildChips();render();};tc.appendChild(b);});
   const kc=$("#kindChips");kc.innerHTML="";
@@ -526,11 +542,11 @@ function runSearch(){const v=$("#zip").value.trim();const ok=!ZIPS||resolveLoc(v
   $("#summary").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"nearest"});}
 $("#goBtn").onclick=runSearch;
 $("#openOnly").onclick=()=>{state.openOnly=!state.openOnly;$("#openOnly").setAttribute("aria-pressed",String(state.openOnly));render();};
-function syncClear(){const n=state.styles.size+state.kinds.size+state.tags.size+(state.openOnly?1:0);$("#clearBtn").hidden=!(n||state.q);
+function syncClear(){const n=state.styles.size+state.kinds.size+state.tags.size+state.ptypes.size+state.feats.size+(state.openOnly?1:0);$("#clearBtn").hidden=!(n||state.q);
   $("#filterBtn").innerHTML="Filters"+(n?`<span class="badge">${n}</span>`:"");}
 $("#filterBtn").onclick=()=>{const f=$("#filters");f.hidden=!f.hidden;$("#filterBtn").setAttribute("aria-expanded",String(!f.hidden));};
 try{$("#today").textContent=new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});}catch(e){}
-$("#clearBtn").onclick=()=>{state.styles.clear();state.kinds.clear();state.tags.clear();state.openOnly=false;$("#openOnly").setAttribute("aria-pressed","false");state.q="";$("#q").value="";persist();buildChips();render();};
+$("#clearBtn").onclick=()=>{state.styles.clear();state.kinds.clear();state.tags.clear();state.ptypes.clear();state.feats.clear();state.openOnly=false;$("#openOnly").setAttribute("aria-pressed","false");state.q="";$("#q").value="";persist();buildChips();render();};
 $("#zip").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();runSearch();}});
 $("#zip").addEventListener("input",e=>{const v=e.target.value;$("#zip").classList.remove("bad");suggest(v);
   if(/^\d{5}$/.test(v.trim())&&ZIPS&&ZIPS[v.trim()]){state.zip=v.trim();persist();render();}
@@ -823,12 +839,16 @@ function osmRadius(o){return Math.min(o.county?25:state.radius,25);}
 function loadOSM(origin){const k=osmKey(origin);if(OSM.key===k)return;OSM.key=k;OSM.status="loading";OSM.items=[];
   try{const c=JSON.parse(sessionStorage.getItem("osm:"+k)||"null");if(c){OSM.items=c;OSM.status="ready";return;}}catch(e){}
   const r=Math.round(osmRadius(origin)*1609),la=origin[0],lo=origin[1];
-  const q=`[out:json][timeout:25];(nwr["leisure"="dance"](around:${r},${la},${lo});nwr["amenity"="dancing_school"](around:${r},${la},${lo});nwr["sport"="dance"](around:${r},${la},${lo}););out center tags 300;`;
+  const q=`[out:json][timeout:25];(nwr["leisure"="dance"](around:${r},${la},${lo});nwr["amenity"="dancing_school"](around:${r},${la},${lo});nwr["sport"="dance"](around:${r},${la},${lo});nwr["name"~"dance|ballroom|salsa|tango|bachata|5rhythms",i](around:${r},${la},${lo}););out center tags 300;`;
   const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
   const tryEp=i=>fetch(EPS[i],{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}})
     .then(r=>{if(!r.ok)throw 0;return r.json();}).catch(e=>{if(i+1<EPS.length)return tryEp(i+1);throw e;});
-  tryEp(0).then(j=>{if(OSM.key!==k)return;
-      OSM.items=(j.elements||[]).filter(e=>e.tags&&e.tags.name).map(e=>{const t=e.tags,lat=e.lat??e.center?.lat,lng=e.lon??e.center?.lon;
+  const nomi=()=>{const dLat=r/111000,dLng=r/(111000*Math.cos(la*Math.PI/180));
+    const vb=[lo-dLng,la+dLat,lo+dLng,la-dLat].map(x=>x.toFixed(4)).join(",");
+    return Promise.all(["dance studio","ballroom","dance school"].map(t=>fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&extratags=1&limit=40&bounded=1&viewbox=${vb}&q=${encodeURIComponent(t)}`,{headers:{"Accept":"application/json"}}).then(r=>r.ok?r.json():[]).catch(()=>[])))
+      .then(arrs=>({elements:[].concat(...arrs).filter(x=>x.name).map(x=>({type:"nom",id:x.osm_type+x.osm_id,lat:+x.lat,lon:+x.lon,tags:{name:x.name,"addr:housenumber":x.address?.house_number,"addr:street":x.address?.road,"addr:city":x.address?.city||x.address?.town||x.address?.village,"addr:postcode":x.address?.postcode,website:x.extratags?.website,phone:x.extratags?.phone,opening_hours:x.extratags?.opening_hours}}))}));};
+  tryEp(0).then(j=>(j.elements||[]).length?j:nomi()).catch(()=>nomi()).then(j=>{if(OSM.key!==k)return;
+      const seenIds=new Set();OSM.items=(j.elements||[]).filter(e=>e.tags&&e.tags.name&&!seenIds.has(e.type+e.id)&&seenIds.add(e.type+e.id)).map(e=>{const t=e.tags,lat=e.lat??e.center?.lat,lng=e.lon??e.center?.lon;
         const addr=[[t["addr:housenumber"],t["addr:street"]].filter(Boolean).join(" "),t["addr:city"]].filter(Boolean).join(", ");
         return {id:"osm-"+e.type+e.id,osm:true,name:t.name,type:t.amenity==="dancing_school"?"school":"school",styles:[],address:addr,zip:t["addr:postcode"]||"",lat,lng,city:t["addr:city"]||"",state:t["addr:state"]||"",phone:t.phone||t["contact:phone"]||"",url:t.website||t["contact:website"]||"",hours:t.opening_hours||"",classes:"",notes:t["dance:style"]?"Styles: "+t["dance:style"].replace(/;/g,", "):""};}).filter(p=>typeof p.lat==="number");
       OSM.status="ready";try{sessionStorage.setItem("osm:"+k,JSON.stringify(OSM.items))}catch(e){}render();})
@@ -841,6 +861,8 @@ function renderPlaces(origin,list){
     list.innerHTML=`<div class="empty"><h2>No venues listed yet</h2><p>Venues are studios, schools, clubs and movement spaces, with their hours and class schedules.</p>${canWrite!==false?'<button class="btn" type="button" onclick="openPlace()">+ Add venue</button>':""}</div>`;return;}
   const m=places.filter(p=>{if(typeof p.lat!=="number")return false;p._mi=miles(origin,[p.lat,p.lng]);if(!inArea(origin,p))return false;if(!inScene(p))return false;
     if(evOnly&&!hostIds.has(p.id))return false;
+    if(state.ptypes.size&&!state.ptypes.has(p.type))return false;
+    if(state.feats.size){const f=p.offers||[];for(const x of state.feats)if(!f.includes(x))return false;}
     if(state.styles.size&&!(p.styles||[]).some(x=>state.styles.has(x)))return false;
     if(state.q){const h=[p.name,p.address,p.city,p.classes,p.notes,p.hours,...(p.styles||[])].join(" ").toLowerCase();if(!h.includes(state.q))return false;}return true;})
     .sort((a,b)=>a._mi-b._mi);
@@ -849,7 +871,7 @@ function renderPlaces(origin,list){
   // merge live OpenStreetMap studios (only with no event-only filters, in non-competition scenes)
   if(!evOnly&&state.scene!=="comp"&&state.scene!=="club"){loadOSM(origin);
     if(OSM.status==="ready"){const near=(a,b)=>miles([a.lat,a.lng],[b.lat,b.lng])<0.25;
-      OSM.items.forEach(o=>{o._mi=miles(origin,[o.lat,o.lng]);if(o._mi>state.radius&&!origin.county)return;if(origin.county&&!(o.zip&&origin.county(String(o.zip).slice(0,5))))return;
+      if(!state.feats.size&&(!state.ptypes.size||state.ptypes.has("school")))OSM.items.forEach(o=>{o._mi=miles(origin,[o.lat,o.lng]);if(o._mi>state.radius&&!origin.county)return;if(origin.county&&!(o.zip&&origin.county(String(o.zip).slice(0,5))))return;
         if(state.q&&![o.name,o.address,o.notes].join(" ").toLowerCase().includes(state.q))return;
         if(places.some(p=>near(p,o)&&(p.name.toLowerCase().slice(0,6)===o.name.toLowerCase().slice(0,6)||near(p,o)&&miles([p.lat,p.lng],[o.lat,o.lng])<0.05)))return;m.push(o);});
       m.sort((a,b)=>a._mi-b._mi);placeCount=m.length;
@@ -866,7 +888,8 @@ function renderPlaces(origin,list){
       <div class="sub">${type?esc(type.label)+" · ":""}${esc([p.address,p.city&&p.state?p.city+", "+p.state:""].filter(Boolean).join(" · "))}</div>
       <div class="pills">${p.osm?'<span class="pill kind" title="From OpenStreetMap, a public map database. Details may be incomplete.">Map listing</span>':""}${styles}${p.unverified?'<span class="pill stale" style="--c:var(--warn)">Unconfirmed</span>':""}</div>
       ${(()=>{const evs=events.filter(e=>e.placeId===p.id);return evs.length?`<div class="venue-evs"><span class="lbl">Dances here</span>${evs.map(e=>`<span>${esc(e.name)} <em>${esc(schedText(e).replace(/^Every /,""))}</em></span>`).join("")}</div>`:"";})()}
-      <dl class="kv">${p.hours?`<dt>Hours</dt><dd>${esc(p.hours)}</dd>`:""}${p.classes?`<dt>Classes</dt><dd>${esc(p.classes)}</dd>`:""}${p.phone?`<dt>Phone</dt><dd class="sel">${esc(p.phone)}</dd>`:""}${p.notes?`<dt>Notes</dt><dd>${esc(p.notes)}</dd>`:""}</dl>
+      ${(p.offers||[]).length?`<div class="feat">${(p.offers||[]).map(id=>{const f=FEATURES.find(x=>x.id===id);return f?`<span>${esc(f.label)}</span>`:"";}).join("")}</div>`:""}
+      <dl class="kv">${p.introOffer?`<dt>Intro offer</dt><dd>${esc(p.introOffer)}</dd>`:""}${p.floorRental?`<dt>Floor rental</dt><dd>${esc(p.floorRental)}</dd>`:""}${p.hours?`<dt>Hours</dt><dd>${esc(p.hours)}</dd>`:""}${p.classes?`<dt>Classes</dt><dd>${esc(p.classes)}</dd>`:""}${p.phone?`<dt>Phone</dt><dd class="sel">${esc(p.phone)}</dd>`:""}${p.notes?`<dt>Notes</dt><dd>${esc(p.notes)}</dd>`:""}</dl>
       <div class="ev-foot">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Website</a>`:""}<a href="https://www.google.com/maps/search/?api=1&query=${mapQ}" target="_blank" rel="noopener">Directions</a>
       ${canWrite!==false?`<button class="linkbtn" type="button" onclick="openPlace('${esc(p.id)}')">Edit</button>`:""}</div></article>`;}).join("")}</div>`;
 }
@@ -874,12 +897,14 @@ const pType=$("#p-type");PLACE_TYPES.forEach(t=>pType.add(new Option(t.label,t.i
 let pStyles=new Set(),editingPlace=null;
 function buildPChips(){const c=$("#p-styles");c.innerHTML="";STYLES.forEach(x=>{const b=chip(x.label,pStyles.has(x.id),x.c,x.t);b.onclick=()=>{pStyles.has(x.id)?pStyles.delete(x.id):pStyles.add(x.id);buildPChips();};c.appendChild(b);});}
 $("#p-zip").addEventListener("input",e=>{const v=e.target.value.replace(/\D/g,"").slice(0,5);e.target.value=v;const z=ZIPS&&ZIPS[v];$("#p-ziphint").textContent=v.length===5?(z?`${z[2]}, ${z[3]}`:"Zip not found"):"";});
-const PF=["name","addr","zip","phone","url","hours","classes","notes"],PK={addr:"address"};
+const PF=["name","addr","zip","phone","url","hours","classes","notes","intro","rental"],PK={addr:"address",intro:"introOffer",rental:"floorRental"};
+let pFeats=new Set();
+function buildPFeats(){const c=$("#p-feats");c.innerHTML="";FEATURES.forEach(x=>{const b=chip(x.label,pFeats.has(x.id));b.onclick=()=>{pFeats.has(x.id)?pFeats.delete(x.id):pFeats.add(x.id);buildPFeats();};c.appendChild(b);});}
 function openPlace(id){
   if(canWrite===false){showNotice("You can view this list but not add to it. Ask the page's owner to invite you as an editor.");return;}
   editingPlace=id||null;const p=id?places.find(x=>x.id===id):null;
   $("#pTitle").textContent=p?"Edit venue":"Add a venue";$("#pDel").hidden=!p;$("#p-err").textContent="";
-  PF.forEach(f=>$("#p-"+f).value=p?.[PK[f]||f]||"");pType.value=p?.type||"ballroom";pStyles=new Set(p?.styles||[]);
+  PF.forEach(f=>$("#p-"+f).value=p?.[PK[f]||f]||"");pType.value=p?.type||"ballroom";pStyles=new Set(p?.styles||[]);pFeats=new Set(p?.offers||[]);buildPFeats();
   $("#p-zip").dispatchEvent(new Event("input"));buildPChips();$("#psheet").hidden=false;$("#p-name").focus();}
 function closePlace(){$("#psheet").hidden=true;editingPlace=null;}
 $("#pCancel").onclick=closePlace;$("#psheet").addEventListener("click",e=>{if(e.target.id==="psheet")closePlace();});
@@ -891,7 +916,7 @@ $("#pform").addEventListener("submit",async e=>{e.preventDefault();const err=$("
   const name=$("#p-name").value.trim(),zip=$("#p-zip").value.trim();if(!name)return err.textContent="Give the studio a name.";
   const z=ZIPS&&ZIPS[zip];if(!z)return err.textContent="Enter a 5-digit zip code so it shows up in radius searches.";
   const url=$("#p-url").value.trim();if(url){try{const u=new URL(url);if(!/^https?:$/.test(u.protocol))throw 0;}catch(_){return err.textContent="The website should start with https://";}}
-  const doc={type:pType.value,styles:[...pStyles],unverified:false,lat:z[0],lng:z[1],city:z[2],state:z[3],updatedAt:new Date().toISOString()};
+  const doc={type:pType.value,styles:[...pStyles],offers:[...pFeats],unverified:false,lat:z[0],lng:z[1],city:z[2],state:z[3],updatedAt:new Date().toISOString()};
   PF.forEach(f=>doc[PK[f]||f]=$("#p-"+f).value.trim());
   $("#pSave").disabled=true;
   try{if(editingPlace)await dbRef.collection("places").doc(editingPlace).update(doc);else{doc.createdAt=doc.updatedAt;if(myId)doc.addedBy=myId;await dbRef.collection("places").add(doc);}closePlace();}
