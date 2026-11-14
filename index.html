@@ -879,8 +879,14 @@ function findMore(origin){const where=origin.county?origin[2]+", "+origin[3]:ori
     <a href="${g("dance studios")}" target="_blank" rel="noopener">Dance studios · Google Maps</a>
     <a href="${g("ballroom dance studio")}" target="_blank" rel="noopener">Ballroom · Google Maps</a>
     <a href="${g("salsa latin dance classes")}" target="_blank" rel="noopener">Salsa &amp; Latin · Google Maps</a>
-    <a href="${y("dance studios")}" target="_blank" rel="noopener">Dance studios · Yelp</a>
-    <a href="https://www.superprof.com/lessons/dance/united-states/" target="_blank" rel="noopener">Private dance coaches · Superprof</a></div></div>`;}
+    <a href="${y("dance studios")}" target="_blank" rel="noopener">Dance studios · Yelp</a></div>
+    <span class="lbl">Find a private teacher or coach</span><div class="fm-links">
+    <a href="https://www.thumbtack.com/k/ballroom-dance-lessons/near-me" target="_blank" rel="noopener">Thumbtack</a>
+    <a href="https://www.superprof.com/lessons/dance/united-states/" target="_blank" rel="noopener">Superprof</a>
+    <a href="https://lessons.com/ballroom-dance-classes-for-adults" target="_blank" rel="noopener">Lessons.com</a>
+    <a href="https://www.wyzant.com/ballroom_dancing_lessons.aspx" target="_blank" rel="noopener">Wyzant</a>
+    <a href="https://dance-teachers.org/" target="_blank" rel="noopener">ISTD certified teachers</a></div>
+    <span class="hint" style="font-size:12.5px;color:var(--muted)">Marketplaces list independent teachers with reviews and rates. Check credentials and book a trial lesson first.</span></div>`;}
 function renderPlaces(origin,list){
   placeCount=0;
   const evOnly=!!(state.tags.size||state.kinds.size||state.openOnly||state.days.size);
