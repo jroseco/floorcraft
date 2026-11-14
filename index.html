@@ -638,10 +638,10 @@ function renderCal(origin,list){
   if(!events.length){$("#summary").textContent="";
     list.innerHTML=`<div class="empty"><h2>No events on the list yet</h2><p>Events are socials, classes, club nights and competitions that everyone using this page can see. Recurring ones (every Friday, 1st &amp; 3rd Saturday) only need to be entered once.</p>${canWrite!==false?'<button class="btn" type="button" onclick="openForm()">+ Add event</button>':""}</div>`;return;}
   const t=todayD(),m=matchesFor(origin);
-  const wkLen=((7-t.getDay())%7)+1;                       // today through Sunday
-  const nowRows=occ(m,t,Math.min(wkLen,state.range));
+  const wkLen=Math.min(state.range,7);                    // every dance, day by day, for the chosen range (up to a week)
+  const nowRows=occ(m,t,wkLen);
   const later=Math.max(0,(state.scene==="comp"?Math.max(state.range,366):state.range)-wkLen);
-  const specialRows=occ(m.filter(e=>e.when?.type==="once"),addDays(t,wkLen),later);
+  const specialRows=later?occ(m.filter(e=>e.when?.type==="once"),addDays(t,wkLen),later):[];
   const regulars=m.filter(e=>e.when&&e.when.type!=="once");
   // your plans (all events, ignoring filters)
   const mine=(myId&&rsvps[myId]?.marks)||{};
@@ -658,14 +658,14 @@ function renderCal(origin,list){
     .sort((a,b)=>(a.start||"99").localeCompare(b.start||"99")||a._mi-b._mi)]).filter(([,l])=>l.length);
   calCount=cnt(nowRows)+cnt(specialRows);
   const rl=$("#range").selectedOptions[0].textContent.toLowerCase();
-  $("#summary").innerHTML=`<span><strong>${cnt(nowRows)}</strong> this week · <strong>${cnt(specialRows)}</strong> special date${cnt(specialRows)===1?"":"s"} · <strong>${regulars.length}</strong> regular${regulars.length===1?"":"s"} ${areaLabel(origin)}</span>`;
-  const wkLabel=t.getDay()===0?"Tonight":t.getDay()===6?"This weekend":"Tonight through Sunday";
+  const wkLabel=wkLen===1?"Today":wkLen===2?"Today &amp; tomorrow":wkLen===7?"Next 7 days":"Next "+wkLen+" days";
+  $("#summary").innerHTML=`<span><strong>${cnt(nowRows)}</strong> dance${cnt(nowRows)===1?"":"s"} ${wkLabel.toLowerCase().replace("next","in the next")}${later?` · <strong>${cnt(specialRows)}</strong> special date${cnt(specialRows)===1?"":"s"} after that · <strong>${regulars.length}</strong> regular${regulars.length===1?"":"s"}`:""} ${areaLabel(origin)}</span>`;
   list.innerHTML=shared+
     (planRows.length?`<h3 class="sub">Your plans</h3>${dayRows(planRows)}`:"")+
     (!m.length&&!state.q&&!state.styles.size&&!state.kinds.size&&!state.tags.size&&!state.openOnly?`<div class="notice">No dances are listed ${areaLabel(origin)} yet. Floorcraft's event listings cover the NY area (Westchester, Rockland, Fairfield County, NYC), South Florida and the Clearwater–St. Pete area. Tap <b>Studios &amp; venues</b> above to see dance studios here, or widen the distance.</div>`:"")+
-    `<h3 class="sub">${wkLabel}</h3>`+(nowRows.length?dayRows(nowRows):`<p class="none">Nothing this week with these filters.</p>`)+
-    `<h3 class="sub">${state.scene==="comp"?"Upcoming competitions":"Special dates"} <span class="subnote">${state.scene==="comp"?"next 12 months":"one-time events, competitions &amp; workshops · "+esc(rl)}</span></h3>`+(specialRows.length?dayRows(specialRows):`<p class="none">No one-time events after this weekend. Try a longer date range.</p>`)+
-    (state.scene==="comp"?"":`<h3 class="sub">Weekly regulars <span class="subnote">recurring socials, classes &amp; club nights</span></h3>`+
+    `<h3 class="sub">${wkLabel}</h3>`+(nowRows.length?dayRows(nowRows):`<p class="none">Nothing in this time frame with these filters.</p>`)+
+    (later?`<h3 class="sub">${state.scene==="comp"?"Upcoming competitions":"Special dates after that"} <span class="subnote">${state.scene==="comp"?"next 12 months":"one-time events, competitions &amp; workshops · "+esc(rl)}</span></h3>`+(specialRows.length?dayRows(specialRows):`<p class="none">No one-time events later in this range.</p>`):"")+
+    (state.scene==="comp"||state.range<=7?"":`<h3 class="sub">Weekly regulars <span class="subnote">recurring socials, classes &amp; club nights</span></h3>`+
     (byDay.length?`<div class="weekgrid">${byDay.map(([dw,l])=>`<div class="wkday"><h4>${DOWL[dw]}</h4>${l.map(ev=>mini(ev,dw)).join("")}</div>`).join("")}</div>`:`<p class="none">No recurring events match these filters.</p>`));
 }
 function stylePills(ev){return (ev.styles||[]).map(id=>{const s=STYLES.find(x=>x.id===id);return s?`<span class="pill" style="--c:var(${s.c})" title="${esc(s.t)}">${esc(s.label)}</span>`:"";}).join("");}
