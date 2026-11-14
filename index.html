@@ -280,7 +280,7 @@ textarea{min-height:64px;resize:vertical}
       <div class="nights" role="group" aria-label="Scene"><span class="flabel">Scene</span><div class="chips" id="sceneChips"></div></div>
     </div>
     <div class="row">
-      <div class="nights" role="group" aria-label="Nights"><span class="flabel">Nights</span><div class="chips" id="dayChips"></div></div>
+      <div class="nights" role="group" aria-label="Days"><span class="flabel">Days</span><div class="chips" id="dayChips"></div></div>
     </div>
     <div class="row">
       <input id="q" type="search" class="kw" placeholder="Search studio, teacher, “hustle”…" aria-label="Narrow by keyword">
@@ -467,11 +467,11 @@ const SCENES=[{id:"all",label:"All"},{id:"partner",label:"Ballroom & partner",st
 function inScene(item){if(state.scene==="all")return true;const sc=SCENES.find(x=>x.id===state.scene);if(sc.kinds)return sc.kinds.includes(item.kind);return (item.styles||[]).some(x=>sc.styles.includes(x));}
 function buildScenes(){const c=$("#sceneChips");c.innerHTML="";SCENES.forEach(sc=>{const b=chip(sc.label,state.scene===sc.id);b.classList.add("preset");b.onclick=()=>{state.scene=sc.id;try{localStorage.setItem("floorcraft-scene",sc.id)}catch(e){}buildScenes();render();};c.appendChild(b);});}
 try{const sv=localStorage.getItem("floorcraft-scene");if(sv&&["all","partner","club","move","comp"].includes(sv))state.scene=sv;}catch(e){}
-const DAY_PRESETS=[{id:"any",label:"Any night",days:[]},{id:"thsa",label:"Thu–Sat",days:[4,5,6]},{id:"wknd",label:"Fri–Sun",days:[5,6,0]}];
+const DAY_PRESETS=[{id:"any",label:"Any day",days:[]},{id:"thsa",label:"Thu–Sat",days:[4,5,6]},{id:"wknd",label:"Fri–Sun",days:[5,6,0]}];
 function buildDays(){const c=$("#dayChips");c.innerHTML="";const cur=[...state.days].sort().join();
   DAY_PRESETS.forEach(pr=>{const on=[...pr.days].sort().join()===cur;const b=chip(pr.label,on);b.classList.add("preset");b.onclick=()=>{state.days=new Set(pr.days);buildDays();render();};c.appendChild(b);});
   [1,2,3,4,5,6,0].forEach(d=>{const b=chip(DOW[d],state.days.has(d));b.classList.add("daychip");b.onclick=()=>{state.days.has(d)?state.days.delete(d):state.days.add(d);buildDays();render();};c.appendChild(b);});}
-const TAGS=[{id:"alcohol-free",label:"Alcohol-free"},{id:"all-ages",label:"All ages"},{id:"early",label:"Starts before 8pm"},{id:"daytime",label:"Daytime"}];
+const TAGS=[{id:"alcohol-free",label:"Alcohol-free"},{id:"all-ages",label:"All ages"} ];
 function evTags(ev){const t=new Set(ev.tags||[]);if(ev.start){if(ev.start<"20:00")t.add("early");if(ev.start>="06:00"&&ev.start<"17:00")t.add("daytime");}return t;}
 try{const s=JSON.parse(localStorage.getItem("floorcraft3")||"{}");
   if(s.zip)state.zip=s.zip; if(s.radius)state.radius=s.radius; if(s.range)state.range=s.range;
@@ -905,7 +905,7 @@ function renderPlaces(origin,list){
   // merge live OpenStreetMap studios (only with no event-only filters, in non-competition scenes)
   if(!evOnly&&state.scene!=="comp"&&state.scene!=="club"){loadOSM(origin);
     if(OSM.status==="ready"){const near=(a,b)=>miles([a.lat,a.lng],[b.lat,b.lng])<0.25;
-      if(!state.feats.size&&(!state.ptypes.size||state.ptypes.has("school")))OSM.items.forEach(o=>{o._mi=miles(origin,[o.lat,o.lng]);if(o._mi>state.radius&&!origin.county)return;if(origin.county&&!(o.zip&&origin.county(String(o.zip).slice(0,5))))return;
+      if(!state.feats.size&&(!state.ptypes.size||state.ptypes.has("school")))OSM.items.forEach(o=>{if(!o.url)return;o._mi=miles(origin,[o.lat,o.lng]);if(o._mi>state.radius&&!origin.county)return;if(origin.county&&!(o.zip&&origin.county(String(o.zip).slice(0,5))))return;
         if(state.q&&![o.name,o.address,o.notes].join(" ").toLowerCase().includes(state.q))return;
         if(places.some(p=>near(p,o)&&(p.name.toLowerCase().slice(0,6)===o.name.toLowerCase().slice(0,6)||near(p,o)&&miles([p.lat,p.lng],[o.lat,o.lng])<0.05)))return;m.push(o);});
       m.sort((a,b)=>a._mi-b._mi);placeCount=m.length;
